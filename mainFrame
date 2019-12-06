@@ -1,0 +1,2141 @@
+import javazoom.jl.decoder.JavaLayerException;
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.*;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.util.ArrayList;
+
+public class SecondVersion {
+    public static void main(String args[]) {
+        new SecondVersionChessMainFrame();
+    }
+}
+
+//主框架类
+class SecondVersionChessMainFrame extends JFrame implements ActionListener, MouseListener, Runnable {
+    char[][] chessMap = new char[10][9];
+    JLabel chess[] = new JLabel[32];//32个棋子
+    JLabel ChessBoard = new JLabel(new ImageIcon("image\\Main.GIF"));
+    Image programImage = new ImageIcon("image\\红将.GIF").getImage();
+    String title = "中国象棋";
+    Container container;
+    JButton newGame;
+    JButton repent;
+    JButton impor;
+    JTextField importChessMap;
+    JLabel hints;
+    JPanel shortCutKeyField = new JPanel(new FlowLayout());
+    ArrayList<String> chainChess;
+    //保存当前操作
+    ChessRule rule;
+    //规则类对象(使于调用方法)
+    /*
+       chessManClick = true 闪烁棋子 并给线程响应
+      chessManClick = false 吃棋子 停止闪烁  并给线程响应
+     */
+    boolean chessManClick;
+    /*
+     控制玩家走棋
+     chessPlayClick=1 黑棋走棋
+     chessPlayClick=2 红棋走棋 默认红棋
+     chessPlayClick=3 双方都不能走棋
+     */
+    int chessPlayClick = 2;
+
+    Font font = new Font("宋体", Font.BOLD, 13);
+    Thread sparklingThread;  //控制棋子闪烁的线程
+    Thread chessMusic;
+    static int chessOrder, i; //把第一次的单击棋子给线程响应
+
+    SecondVersionChessMainFrame() {
+        container = this.getContentPane();
+        container.setLayout(null);
+        rule = new ChessRule();
+        chainChess = new ArrayList<String>();
+        hints = new JLabel("欢迎参加象棋对弈");
+        newGame = new JButton(" 新游戏 ");
+        repent = new JButton(" 悔棋 ");
+        importChessMap = new JTextField("导入棋谱文件路径");
+        impor = new JButton("导入棋局");
+        shortCutKeyField.add(newGame);
+        shortCutKeyField.add(repent);
+        shortCutKeyField.add(impor);
+        shortCutKeyField.add(importChessMap);
+        shortCutKeyField.add(hints);
+        newGame.setFont(font);
+        repent.setFont(font);
+        hints.setFont(font);
+        repent.setFont(font);
+        shortCutKeyField.setBounds(0, 0, 558, 29);
+        container.add(shortCutKeyField);
+        drawingChess();
+        newGame.addActionListener(this);
+        repent.addActionListener(this);
+        for (int i = 0; i < 32; i++) {
+            container.add(chess[i]);
+            chess[i].addMouseListener(this);
+        }
+        container.add(ChessBoard);
+        ChessBoard.setBounds(0, 30, 558, 620);
+        ChessBoard.addMouseListener(this);
+        this.setIconImage(programImage);
+        this.setTitle(title);
+        this.setSize(558, 670);
+        this.setLocationRelativeTo(null);//窗口居中显示
+        this.setResizable(false);//生成窗口是否可以拉伸
+        setVisible(true);//可视化
+        this.addWindowListener(
+                new WindowAdapter() {
+                    public void windowClosing(WindowEvent we) {
+                        System.exit(0);
+                    }
+                }
+        );//设置×为结束进程而非不可视化
+    }
+
+    public void initializeChessMap() {
+        chessMap[0][0] = 'C';
+        chessMap[0][1] = 'H';
+        chessMap[0][2] = 'E';
+        chessMap[0][3] = 'A';
+        chessMap[0][4] = 'G';
+        chessMap[0][5] = 'A';
+        chessMap[0][6] = 'E';
+        chessMap[0][7] = 'H';
+        chessMap[0][8] = 'C';
+        chessMap[2][1] = 'N';
+        chessMap[2][7] = 'N';
+        chessMap[3][0] = 'S';
+        chessMap[3][2] = 'S';
+        chessMap[3][4] = 'S';
+        chessMap[3][6] = 'S';
+        chessMap[3][8] = 'S';
+        //以上是黑方棋子
+        chessMap[9][0] = 'c';
+        chessMap[9][1] = 'h';
+        chessMap[9][2] = 'e';
+        chessMap[9][3] = 'a';
+        chessMap[9][4] = 'g';
+        chessMap[9][5] = 'a';
+        chessMap[9][6] = 'e';
+        chessMap[9][7] = 'h';
+        chessMap[9][8] = 'c';
+        chessMap[7][1] = 'n';
+        chessMap[7][7] = 'n';
+        chessMap[6][0] = 's';
+        chessMap[6][2] = 's';
+        chessMap[6][4] = 's';
+        chessMap[6][6] = 's';
+        chessMap[6][8] = 's';
+        //以上是红方棋子
+    }//初始化ChessMap 在这里设置导入棋谱
+
+    public void drawingChess() {
+        initializeChessMap();
+        //黑色棋子
+        //黑车
+        int count01 = 0;
+        for (int j = 0; j < 10; j++) {
+            for (int p = 0; p < 9; p++) {
+                if (chessMap[j][p] == 'C') {
+                    Icon temp = new ImageIcon("image\\黑车.GIF");
+                    chess[count01] = new JLabel(temp);
+                    chess[count01].setBounds(24 + 57 * p, 56 + 57 * j, 55, 55);
+                    chess[count01].setName("车1");
+                    count01 = count01 + 1;
+                }
+            }
+        }
+        //车
+        int count23 = 2;
+        for (int j = 0; j < 10; j++) {
+            for (int p = 0; p < 9; p++) {
+                if (chessMap[j][p] == 'c') {
+                    Icon temp = new ImageIcon("image\\红车.GIF");
+                    chess[count23] = new JLabel(temp);
+                    chess[count23].setBounds(24 + 57 * p, 56 + 57 * j, 55, 55);
+                    chess[count23].setName("车2");
+                    count23 = count23 + 1;
+                }
+            }
+        }
+        //黑马
+        int count45 = 4;
+        for (int j = 0; j < 10; j++) {
+            for (int p = 0; p < 9; p++) {
+                if (chessMap[j][p] == 'H') {
+                    Icon temp = new ImageIcon("image\\黑马.GIF");
+                    chess[count45] = new JLabel(temp);
+                    chess[count45].setBounds(24 + 57 * p, 56 + 57 * j, 55, 55);
+                    chess[count45].setName("马1");
+                    count45 = count45 + 1;
+                }
+            }
+        }
+        //相
+        int count89 = 8;
+        for (int j = 0; j < 10; j++) {
+            for (int p = 0; p < 9; p++) {
+                if (chessMap[j][p] == 'E') {
+                    Icon temp = new ImageIcon("image\\黑象.GIF");
+                    chess[count89] = new JLabel(temp);
+                    chess[count89].setBounds(24 + 57 * p, 56 + 57 * j, 55, 55);
+                    chess[count89].setName("象1");
+                    count89 = count89 + 1;
+                }
+            }
+        }
+        //士
+        int count1213 = 12;
+        for (int j = 0; j < 10; j++) {
+            for (int p = 0; p < 9; p++) {
+                if (chessMap[j][p] == 'A') {
+                    Icon temp = new ImageIcon("image\\黑士.GIF");
+                    chess[count1213] = new JLabel(temp);
+                    chess[count1213].setBounds(24 + 57 * p, 56 + 57 * j, 55, 55);
+                    chess[count1213].setName("士1");
+                    count1213 = count1213 + 1;
+                }
+            }
+        }
+        //卒
+        int count1620 = 16;
+        for (int j = 0; j < 10; j++) {
+            for (int p = 0; p < 9; p++) {
+                if (chessMap[j][p] == 'S') {
+                    Icon temp = new ImageIcon("image\\黑卒.GIF");
+                    chess[count1620] = new JLabel(temp);
+                    chess[count1620].setBounds(24 + 57 * p, 56 + 57 * j, 55, 55);
+                    chess[count1620].setName("卒1" + count1620);
+                    count1620 = count1620 + 1;
+                }
+            }
+        }
+        //炮
+        int count2627 = 26;
+        for (int j = 0; j < 10; j++) {
+            for (int p = 0; p < 9; p++) {
+                if (chessMap[j][p] == 'N') {
+                    Icon temp = new ImageIcon("image\\黑炮.GIF");
+                    chess[count2627] = new JLabel(temp);
+                    chess[count2627].setBounds(24 + 57 * p, 56 + 57 * j, 55, 55);
+                    chess[count2627].setName("炮1" + count2627);
+                    count2627 = count2627 + 1;
+                }
+            }
+        }
+        //将
+        int count30 = 30;
+        for (int j = 0; j < 10; j++) {
+            for (int p = 0; p < 9; p++) {
+                if (chessMap[j][p] == 'G') {
+                    Icon temp = new ImageIcon("image\\黑将.GIF");
+                    chess[count30] = new JLabel(temp);
+                    chess[count30].setBounds(24 + 57 * p, 56 + 57 * j, 55, 55);
+                    chess[count30].setName("炮1" + count30);
+                }
+            }
+        }
+        //马
+        int count67 = 6;
+        for (int j = 0; j < 10; j++) {
+            for (int p = 0; p < 9; p++) {
+                if (chessMap[j][p] == 'h') {
+                    Icon temp = new ImageIcon("image\\红马.GIF");
+                    chess[count67] = new JLabel(temp);
+                    chess[count67].setBounds(24 + 57 * p, 56 + 57 * j, 55, 55);
+                    chess[count67].setName("马2");
+                    count67 = count67 + 1;
+                }
+            }
+        }
+
+        //相
+        int count1011 = 10;
+        for (int j = 0; j < 10; j++) {
+            for (int p = 0; p < 9; p++) {
+                if (chessMap[j][p] == 'e') {
+                    Icon temp = new ImageIcon("image\\红象.GIF");
+                    chess[count1011] = new JLabel(temp);
+                    chess[count1011].setBounds(24 + 57 * p, 56 + 57 * j, 55, 55);
+                    chess[count1011].setName("象2");
+                    count1011 = count1011 + 1;
+                }
+            }
+        }
+        //士
+        int count1415 = 14;
+        for (int j = 0; j < 10; j++) {
+            for (int p = 0; p < 9; p++) {
+                if (chessMap[j][p] == 'a') {
+                    Icon temp = new ImageIcon("image\\红士.GIF");
+                    chess[count1415] = new JLabel(temp);
+                    chess[count1415].setBounds(24 + 57 * p, 56 + 57 * j, 55, 55);
+                    chess[count1415].setName("士2");
+                    count1415 = count1415 + 1;
+                }
+            }
+        }
+        //兵
+        int count2125 = 21;
+        for (int j = 0; j < 10; j++) {
+            for (int p = 0; p < 9; p++) {
+                if (chessMap[j][p] == 's') {
+                    Icon temp = new ImageIcon("image\\红卒.GIF");
+                    chess[count2125] = new JLabel(temp);
+                    chess[count2125].setBounds(24 + 57 * p, 56 + 57 * j, 55, 55);
+                    ////////////////////
+                    chess[count01].setVisible(true);//这里存疑
+                    chess[count2125].setName("卒2" + count2125);
+
+                    count2125 = count2125 + 1;
+                }
+            }
+        }
+
+        //炮
+        int count2829 = 28;
+        for (int j = 0; j < 10; j++) {
+            for (int p = 0; p < 9; p++) {
+                if (chessMap[j][p] == 'n') {
+                    Icon temp = new ImageIcon("image\\红炮.GIF");
+                    chess[count2829] = new JLabel(temp);
+                    chess[count2829].setBounds(24 + 57 * p, 56 + 57 * j, 55, 55);
+                    chess[count2829].setName("炮2" + count2829);
+                    count2829 = count2829 + 1;
+                }
+            }
+        }
+        //帅
+        int count31 = 31;
+        for (int j = 0; j < 10; j++) {
+            for (int p = 0; p < 9; p++) {
+                if (chessMap[j][p] == 'g') {
+                    Icon temp = new ImageIcon("image\\红将.GIF");
+                    chess[count31] = new JLabel(temp);
+                    chess[count31].setBounds(24 + 57 * p, 56 + 57 * j, 55, 55);
+                    chess[count31].setName("帅2");
+                    count31 = count31 + 1;
+                }
+            }
+        }
+    }
+
+    public void mouseClicked(MouseEvent event) {
+        System.out.println("Mouse");
+        System.out.println(chainChess);
+        //当前坐标
+        int Ex = 0, Ey = 0;
+        //启动线程
+        if (sparklingThread == null) {//闪耀线程
+            sparklingThread = new Thread(this);//实例化的线程只能使用一次
+            sparklingThread.start();
+        }
+        if(chessMusic==null){//落子音乐线程
+            try {
+                new BlackBoardMusic(new File("E:\\IdeaWorkSpace\\src\\chessMusic.mp3")).play();
+            } catch (FileNotFoundException e) {
+                e.printStackTrace();
+            } catch (JavaLayerException e) {
+                e.printStackTrace();
+            }
+        }
+
+        //单击棋盘(移动棋子)
+        if (event.getSource().equals(ChessBoard)) {
+            //该红棋走棋的时候
+            if (chessPlayClick == 2 && chess[chessOrder].getName().charAt(1) == '2') {
+                Ex = chess[chessOrder].getX();
+                Ey = chess[chessOrder].getY();
+                //移动卒、兵
+                if (chessOrder > 15 && chessOrder < 26) {
+                    rule.oldierMoveRule(chessOrder, chess[chessOrder], event);
+                }
+
+                //移动炮
+                else if (chessOrder > 25 && chessOrder < 30) {
+                    rule.cannonAndChariotMove(chess[chessOrder], chess, event);
+                }
+
+                //移动车
+                else if (chessOrder >= 0 && chessOrder < 4) {
+                    rule.cannonAndChariotMove(chess[chessOrder], chess, event);
+                }
+
+                //移动马
+                else if (chessOrder > 3 && chessOrder < 8) {
+                    rule.horseMoveRule(chess[chessOrder], chess, event);
+                }
+
+                //移动相、象
+                else if (chessOrder > 7 && chessOrder < 12) {
+                    rule.elephantMoveRule(chessOrder, chess[chessOrder], chess, event);
+                }
+
+                //移动仕、士
+                else if (chessOrder > 11 && chessOrder < 16) {
+                    rule.dvisorMoveRule(chessOrder, chess[chessOrder], chess, event);
+                }
+
+                //移动将、帅
+                else if (chessOrder == 30 || chessOrder == 31) {
+                    rule.eneralMoveRule(chessOrder, chess[chessOrder], chess, event);
+                }
+
+                //是否走棋错误(是否在原地没有动)
+                if (Ex == chess[chessOrder].getX() && Ey == chess[chessOrder].getY()) {
+                    hints.setText("红方走棋");
+                    chessPlayClick = 2;
+                } else {
+                    hints.setText("黑方走棋");
+                    chessPlayClick = 1;
+                }
+
+            }//if
+
+            //该黑棋走棋的时候
+            else if (chessPlayClick == 1 && chess[chessOrder].getName().charAt(1) == '1') {
+                Ex = chess[chessOrder].getX();
+                Ey = chess[chessOrder].getY();
+
+
+                if (chessOrder > 15 && chessOrder < 26) { //移动卒、兵
+                    rule.oldierMoveRule(chessOrder, chess[chessOrder], event);
+                } else if (chessOrder > 25 && chessOrder < 30) { //移动炮
+                    rule.cannonAndChariotMove(chess[chessOrder], chess, event);
+                }
+
+                //移动车
+                else if (chessOrder >= 0 && chessOrder < 4) {
+                    rule.cannonAndChariotMove(chess[chessOrder], chess, event);
+                }
+
+                //移动马
+                else if (chessOrder > 3 && chessOrder < 8) {
+                    rule.horseMoveRule(chess[chessOrder], chess, event);
+                }
+
+                //移动相、象
+                else if (chessOrder > 7 && chessOrder < 12) {
+                    rule.elephantMoveRule(chessOrder, chess[chessOrder], chess, event);
+                }
+
+                //移动仕、士
+                else if (chessOrder > 11 && chessOrder < 16) {
+                    rule.dvisorMoveRule(chessOrder, chess[chessOrder], chess, event);
+                }
+
+                //移动将、帅
+                else if (chessOrder == 30 || chessOrder == 31) {
+                    rule.eneralMoveRule(chessOrder, chess[chessOrder], chess, event);
+                }
+
+                //是否走棋错误(是否在原地没有动)
+                if (Ex == chess[chessOrder].getX() && Ey == chess[chessOrder].getY()) {
+                    hints.setText("黑方走棋");
+                    chessPlayClick = 1;
+                } else {
+                    hints.setText("红方走棋");
+                    chessPlayClick = 2;
+                }
+
+
+            }//else if
+
+            //当前没有操作(停止闪烁)
+            chessManClick = false;
+
+        }//if
+        //单击棋子
+        else {
+            //第一次单击棋子(闪烁棋子)
+            if (!chessManClick) {
+                for (int i = 0; i < 32; i++) {
+                    //被单击的棋子
+                    if (event.getSource().equals(chess[i])) {
+                        //告诉线程让该棋子闪烁
+                        chessOrder = i;
+                        //开始闪烁
+                        chessManClick = true;
+                        break;
+                    }
+                }//for
+            }//if
+
+            //第二次单击棋子(吃棋子)
+            else if (chessManClick) {
+                //当前没有操作(停止闪烁)
+                chessManClick = false;
+
+                for (i = 0; i < 32; i++) {
+                    //找到被吃的棋子
+                    if (event.getSource().equals(chess[i])) {
+                        //该红棋吃棋的时候
+                        if (chessPlayClick == 2 && chess[chessOrder].getName().charAt(1) == '2') {
+                            Ex = chess[chessOrder].getX();
+                            Ey = chess[chessOrder].getY();
+
+                            //卒、兵吃规则
+                            if (chessOrder > 15 && chessOrder < 26) {
+                                rule.oldierEatRule(chess[chessOrder], chess[i]);
+                            }
+
+                            //炮吃规则
+                            else if (chessOrder > 25 && chessOrder < 30) {
+                                rule.cannonAndChariotEat(0, chess[chessOrder], chess[i], chess, event);
+                            }
+
+                            //车吃规则
+                            else if (chessOrder >= 0 && chessOrder < 4) {
+                                rule.cannonAndChariotEat(1, chess[chessOrder], chess[i], chess, event);
+                            }
+
+                            //马吃规则
+                            else if (chessOrder > 3 && chessOrder < 8) {
+                                rule.horseEatRule(chess[chessOrder], chess[i], chess, event);
+                            }
+
+                            //相、象吃规则
+                            else if (chessOrder > 7 && chessOrder < 12) {
+                                rule.elephantEatRule(chess[chessOrder], chess[i], chess);
+                            }
+
+                            //士、仕吃棋规则
+                            else if (chessOrder > 11 && chessOrder < 16) {
+                                rule.dvisorEatRule(chessOrder, chess[chessOrder], chess[i], chess);
+                            }
+
+                            //将、帅吃棋规则
+                            else if (chessOrder == 30 || chessOrder == 31) {
+                                rule.eneralEatRule(chessOrder, chess[chessOrder], chess[i], chess);
+                                chess[chessOrder].setVisible(true);
+                            }
+
+                            //是否走棋错误(是否在原地没有动)
+                            if (Ex == chess[chessOrder].getX() && Ey == chess[chessOrder].getY()) {
+                                hints.setText("红方走棋");
+                                chessPlayClick = 2;
+                                break;
+                            } else {
+                                hints.setText("黑方走棋");
+                                chessPlayClick = 1;
+                                break;
+                            }
+
+                        }//if
+
+                        //该黑棋吃棋的时候
+                        else if (chessPlayClick == 1 && chess[chessOrder].getName().charAt(1) == '1') {
+                            Ex = chess[chessOrder].getX();
+                            Ey = chess[chessOrder].getY();
+
+                            //卒吃规则
+                            if (chessOrder > 15 && chessOrder < 26) {
+                                rule.oldierEatRule(chess[chessOrder], chess[i]);
+                            }
+
+                            //炮吃规则
+                            else if (chessOrder > 25 && chessOrder < 30) {
+                                rule.cannonAndChariotEat(0, chess[chessOrder], chess[i], chess, event);
+                            }
+
+                            //车吃规则
+                            else if (chessOrder >= 0 && chessOrder < 4) {
+                                rule.cannonAndChariotEat(1, chess[chessOrder], chess[i], chess, event);
+                            }
+
+                            //马吃规则
+                            else if (chessOrder > 3 && chessOrder < 8) {
+                                rule.horseEatRule(chess[chessOrder], chess[i], chess, event);
+                            }
+
+                            //相、象吃规则
+                            else if (chessOrder > 7 && chessOrder < 12) {
+                                rule.elephantEatRule(chess[chessOrder], chess[i], chess);
+                            }
+
+                            //士、仕吃棋规则
+                            else if (chessOrder > 11 && chessOrder < 16) {
+                                rule.dvisorEatRule(chessOrder, chess[chessOrder], chess[i], chess);
+                            }
+
+                            //将、帅吃棋规则
+                            else if (chessOrder == 30 || chessOrder == 31) {
+                                rule.eneralEatRule(chessOrder, chess[chessOrder], chess[i], chess);
+                                chess[chessOrder].setVisible(true);
+                            }
+
+                            //是否走棋错误(是否在原地没有动)
+                            if (Ex == chess[chessOrder].getX() && Ey == chess[chessOrder].getY()) {
+                                hints.setText("黑棋走棋");
+                                chessPlayClick = 1;
+                                break;
+                            } else {
+                                hints.setText("红棋走棋");
+                                chessPlayClick = 2;
+                                break;
+                            }
+
+                        }//else if
+
+                    }//if
+
+                }//for
+
+                //是否胜利
+                if (!chess[31].isVisible()) {
+                    JOptionPane.showConfirmDialog(
+                            this, "黑方胜利", "黑方胜利",
+                            JOptionPane.DEFAULT_OPTION, JOptionPane.WARNING_MESSAGE);
+                    //双方都不可以在走棋了
+                    chessPlayClick = 3;
+                    hints.setText("黑方胜利");
+
+                }//if
+
+                else if (!chess[30].isVisible()) {
+                    JOptionPane.showConfirmDialog(
+                            this, "红方胜利", "红方胜利",
+                            JOptionPane.DEFAULT_OPTION, JOptionPane.WARNING_MESSAGE);
+                    chessPlayClick = 3;
+                    hints.setText("红方胜利");
+                }//else if
+
+            }//else
+
+        }//else
+
+    }
+
+    /**
+     * * 线程方法控制棋子闪烁
+     */
+    public void run() {
+        while (true) {
+            //单击棋子第一下开始闪烁
+            /**
+             * * 单击棋子
+             * * chessManClick = true 闪烁棋子 并给线程响应
+             * * chessManClick = false 吃棋子 停止闪烁  并给线程响应
+             */
+            if (chessManClick) {
+                chess[chessOrder].setVisible(false);
+                //时间控制
+                try {
+                    sparklingThread.sleep(200);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+                chess[chessOrder].setVisible(true);
+            }
+            //闪烁当前提示信息 以免用户看不见
+            try {
+                sparklingThread.sleep(200);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            chess[chessOrder].setVisible(true);
+        }
+    }
+
+    /**
+     * * 定义按钮的事件响应
+     */
+    public void actionPerformed(ActionEvent event) {
+        //重新开始按钮
+        if (event.getSource().equals(newGame)) {
+            if (importChessMap.getText().equals("导入棋谱文件路径")) {
+                initializeChessMap();
+                chess = ReadInChessBoard.ReadIn.setChessOrder(chessMap, chess);
+                chessPlayClick = 2;
+                hints.setText("红方走棋");
+                for (int i = 0; i < 32; i++) {
+                    chess[i].setVisible(true);
+                }
+                chainChess.clear();
+            } else {//输入了导入路径
+                String filePath = importChessMap.getText();
+//   默认路径   filePath ="C:\\Users\\Administrator\\Desktop\\readin1.txt";
+//   默认路径   filePath ="C:\\Users\\Administrator\\Desktop\\readin2.txt";
+                chessMap = ReadInChessBoard.ReadIn.readInChessMap(filePath);
+                chess = ReadInChessBoard.ReadIn.setChessOrder(chessMap, chess);
+                chessPlayClick = ReadInChessBoard.ReadIn.getChessPlayClick(filePath);
+
+                if (chessPlayClick == 2) hints.setText("红方走棋");
+                if (chessPlayClick == 1) hints.setText("黑方走棋");
+
+                for (i = 0; i < 32; i++) {
+                    chess[i].setVisible(true);
+                }
+                chainChess.clear();
+            }
+        }
+
+        //悔棋按钮
+        else if (event.getSource().equals(repent)) {
+//            if(chainChess.get(0)==null){
+////                JOptionPane.showMessageDialog(null, "无路可退", "提示", JOptionPane.YES_OPTION);
+////                return;
+////            }
+
+                try {
+                    if (chainChess.get(chainChess.size() - 4) == "false") {
+                        JOptionPane.showMessageDialog(null, "不能悔棋", "提示", JOptionPane.YES_OPTION);
+                        return;
+                    }
+
+
+                    int x = Integer.parseInt(chainChess.get(chainChess.size() - 3));
+                    int y = Integer.parseInt(chainChess.get(chainChess.size() - 2));
+                    int order = Integer.parseInt(chainChess.get(chainChess.size() - 1));
+                    chess[order].setVisible(true);
+                    chess[order].setBounds(x, y, 55, 55);
+                    if (chess[order].getName().charAt(1) == '1') {
+                        hints.setText("黑方走棋");
+                        chessPlayClick = 1;
+                    } else {
+                        hints.setText("红方走棋");
+                        chessPlayClick = 2;
+                    }
+                    chainChess.remove(chainChess.size() - 4);
+                    chainChess.remove(chainChess.size() - 3);
+                    chainChess.remove(chainChess.size() - 2);
+                    chainChess.remove(chainChess.size() - 1);
+                    //停止旗子闪烁
+                    chessManClick = false;
+                } catch (Exception e) {JOptionPane.showMessageDialog(null, "无路可退", "提示", JOptionPane.YES_OPTION);
+                }
+
+            } else if (event.getSource().equals(impor)) {
+                JOptionPane.showInputDialog(null, "输入棋局文件路径", "导入棋局", JOptionPane.QUESTION_MESSAGE);
+            }
+
+    }
+
+    /*定义中国象棋规则的类*/
+    class ChessRule {
+        /**
+         * 卒子的移动规则
+         */
+        public void oldierMoveRule(int chessOrder, JLabel chess, MouseEvent event) {//前边已经判断过是
+            chess.setVisible(true);
+            //黑卒向下
+            if (chessOrder < 21) {
+                //向下移动、得到终点的坐标模糊成合法的坐标
+                if ((event.getY() - chess.getY()) > 27 && (event.getY() - chess.getY()) < 86 && (event.getX() - chess.getX()) < 55 && (event.getX() - chess.getX()) > 0) {
+
+                    //当前记录添加到集合(用于悔棋)
+
+                    chainChess.add(String.valueOf(chess.isVisible()));
+                    chainChess.add(String.valueOf(chess.getX()));
+                    chainChess.add(String.valueOf(chess.getY()));
+                    chainChess.add(String.valueOf(chessOrder));
+
+                    chess.setBounds(chess.getX(), chess.getY() + 57, 55, 55);
+                }
+
+                //向右移动、得到终点的坐标模糊成合法的坐标、必须过河
+                else if (chess.getY() > 284 && (event.getX() - chess.getX()) >= 57 && (event.getX() - chess.getX()) <= 112) {
+                    chess.setBounds(chess.getX() + 57, chess.getY(), 55, 55);
+                }
+
+                //向左移动、得到终点的坐标模糊成合法的坐标、必须过河
+                else if (chess.getY() > 284 && (chess.getX() - event.getX()) >= 2 && (chess.getX() - event.getX()) <= 58) {
+                    //模糊坐标
+                    chess.setBounds(chess.getX() - 57, chess.getY(), 55, 55);
+                }
+            }
+
+            //红卒向上
+            else {
+                //当前记录添加到集合(用于悔棋)
+                chainChess.add(String.valueOf(chess.isVisible()));
+                chainChess.add(String.valueOf(chess.getX()));
+                chainChess.add(String.valueOf(chess.getY()));
+                chainChess.add(String.valueOf(chessOrder));
+
+                //向上移动、得到终点的坐标模糊成合法的坐标
+                if ((event.getX() - chess.getX()) >= 0 && (event.getX() - chess.getX()) <= 55 && (chess.getY() - event.getY()) > 27 && chess.getY() - event.getY() < 86) {
+                    chess.setBounds(chess.getX(), chess.getY() - 57, 55, 55);
+                }
+
+                //向右移动、得到终点的坐标模糊成合法的坐标、必须过河
+                else if (chess.getY() <= 341 && (event.getX() - chess.getX()) >= 57 && (event.getX() - chess.getX()) <= 112) {
+                    chess.setBounds(chess.getX() + 57, chess.getY(), 55, 55);
+                }
+
+                //向左移动、得到终点的坐标模糊成合法的坐标、必须过河
+                else if (chess.getY() <= 341 && (chess.getX() - event.getX()) >= 3 && (chess.getX() - event.getX()) <= 58) {
+                    chess.setBounds(chess.getX() - 57, chess.getY(), 55, 55);
+                }
+            }
+        }//卒移动结束
+
+        /**
+         * 卒吃棋规则
+         */
+        public void oldierEatRule(JLabel eatChess, JLabel eatenChess) {
+            //向右走
+            if ((eatenChess.getX() - eatChess.getX()) <= 112 && (eatenChess.getX() - eatChess.getX()) >= 57 && (eatChess.getY() - eatenChess.getY()) < 22 && (eatChess.getY() - eatenChess.getY()) > -22 && eatenChess.isVisible() && eatChess.getName().charAt(1) != eatenChess.getName().charAt(1)) {
+                //黑棋要过河才能右吃棋
+                if (eatChess.getName().charAt(1) == '1' && eatChess.getY() > 284 && eatChess.getName().charAt(1) != eatenChess.getName().charAt(1)) {
+
+                    eatenChess.setVisible(false);
+                    //把对方的位置给自己
+                    eatChess.setBounds(eatenChess.getX(), eatenChess.getY(), 55, 55);
+                }
+
+                //红棋要过河才左能吃棋
+                else if (eatChess.getName().charAt(1) == '2' && eatChess.getY() < 341 && eatChess.getName().charAt(1) != eatenChess.getName().charAt(1)) {
+                    eatenChess.setVisible(false);
+                    //把对方的位置给自己
+                    eatChess.setBounds(eatenChess.getX(), eatenChess.getY(), 55, 55);
+                }
+            }
+
+            //向左走
+            else if ((eatChess.getX() - eatenChess.getX()) <= 112 && (eatChess.getX() - eatenChess.getX()) >= 57 && (eatChess.getY() - eatenChess.getY()) < 22 && (eatChess.getY() - eatenChess.getY()) > -22 && eatenChess.isVisible() && eatChess.getName().charAt(1) != eatenChess.getName().charAt(1)) {
+                //黑棋要过河才能左吃棋
+                if (eatChess.getName().charAt(1) == '1' && eatChess.getY() > 284 && eatChess.getName().charAt(1) != eatenChess.getName().charAt(1)) {
+                    eatenChess.setVisible(false);
+                    //把对方的位置给自己
+                    eatChess.setBounds(eatenChess.getX(), eatenChess.getY(), 55, 55);
+                }
+
+                //红棋要过河才能右吃棋
+                else if (eatChess.getName().charAt(1) == '2' && eatChess.getY() < 341 && eatChess.getName().charAt(1) != eatenChess.getName().charAt(1)) {
+                    eatenChess.setVisible(false);
+                    //把对方的位置给自己
+                    eatChess.setBounds(eatenChess.getX(), eatenChess.getY(), 55, 55);
+                }
+            }
+
+            //向上走
+            else if (eatChess.getX() - eatenChess.getX() >= -22 && eatChess.getX() - eatenChess.getX() <= 22 && eatChess.getY() - eatenChess.getY() >= -112 && eatChess.getY() - eatenChess.getY() <= 112) {
+                //黑棋不能向上吃棋
+                if (eatChess.getName().charAt(1) == '1' && eatChess.getY() < eatenChess.getY() && eatChess.getName().charAt(1) != eatenChess.getName().charAt(1)) {
+                    eatenChess.setVisible(false);
+                    //把对方的位置给自己
+                    eatChess.setBounds(eatenChess.getX(), eatenChess.getY(), 55, 55);
+                }
+
+                //红棋不能向下吃棋
+                else if (eatChess.getName().charAt(1) == '2' && eatChess.getY() > eatenChess.getY() && eatChess.getName().charAt(1) != eatenChess.getName().charAt(1)) {
+                    eatenChess.setVisible(false);
+                    //把对方的位置给自己
+                    eatChess.setBounds(eatenChess.getX(), eatenChess.getY(), 55, 55);
+                }
+            }
+            chainChess.add(String.valueOf(eatChess.isVisible()));
+            chainChess.add(String.valueOf(eatChess.getX()));
+            chainChess.add(String.valueOf(eatChess.getY()));
+            chainChess.add(String.valueOf(chessOrder));
+            chainChess.add(String.valueOf(eatenChess.isVisible()));
+            chainChess.add(String.valueOf(eatenChess.getX()));
+            chainChess.add(String.valueOf(eatenChess.getY()));
+            chainChess.add(String.valueOf(i));
+
+        }//卒吃结束
+
+        /**
+         * 炮、车移动规则
+         */
+        public void cannonAndChariotMove(JLabel chess, JLabel chesses[], MouseEvent event) {
+            //起点和终点之间是否有棋子
+            int Count = 0;
+
+            //上、下移动
+            if (chess.getX() - event.getX() <= 0 && chess.getX() - event.getX() >= -55) {
+                //指定所有模糊Y坐标
+                for (int i = 56; i <= 571; i += 57) {
+                    //移动的Y坐标是否有指定坐标相近的
+                    if (i - event.getY() >= -27 && i - event.getY() <= 27) {
+                        //所有的棋子
+                        for (int j = 0; j < 32; j++) {
+                            //找出在同一条竖线的所有棋子、并不包括自己
+                            if (chesses[j].getX() - chess.getX() >= -27 && chesses[j].getX() - chess.getX() <= 27 && chesses[j].getName() != chess.getName() && chesses[j].isVisible()) {
+                                //从起点到终点(从左到右)
+                                for (int k = chess.getY() + 57; k < i; k += 57) {
+                                    //大于起点、小于终点的坐标就可以知道中间是否有棋子
+                                    if (chesses[j].getY() < i && chesses[j].getY() > chess.getY()) {
+                                        //中间有一个棋子就不可以从这条竖线过去
+                                        Count++;
+                                        break;
+                                    }
+                                }//for
+
+                                //从起点到终点(从右到左)
+                                for (int k = i + 57; k < chess.getY(); k += 57) {
+                                    //找起点和终点的棋子
+                                    if (chesses[j].getY() < chess.getY() && chesses[j].getY() > i) {
+                                        Count++;
+                                        break;
+                                    }
+                                }//for
+                            }//if
+                        }//for
+
+                        //起点和终点没有棋子就可以移动了
+                        if (Count == 0) {
+                            //当前记录添加到集合(用于悔棋)
+                            chainChess.add(String.valueOf(chess.isVisible()));
+                            chainChess.add(String.valueOf(chess.getX()));
+                            chainChess.add(String.valueOf(chess.getY()));
+                            chainChess.add(String.valueOf(chessOrder));
+                            chess.setBounds(chess.getX(), i, 55, 55);
+                            break;
+                        }
+                    }//if
+                }//for
+            }//if
+
+            //左、右移动
+            else if (chess.getY() - event.getY() >= -27 && chess.getY() - event.getY() <= 27) {
+                //指定所有模糊X坐标
+                for (int i = 24; i <= 480; i += 57) {
+                    //移动的X坐标是否有指定坐标相近的
+                    if (i - event.getX() >= -55 && i - event.getX() <= 0) {
+                        //所有的棋子
+                        for (int j = 0; j < 32; j++) {
+                            //找出在同一条横线的所有棋子、并不包括自己
+                            if (chesses[j].getY() - chess.getY() >= -27 && chesses[j].getY() - chess.getY() <= 27 && chesses[j].getName() != chess.getName() && chesses[j].isVisible()) {
+                                //从起点到终点(从上到下)
+                                for (int k = chess.getX() + 57; k < i; k += 57) {
+                                    //大于起点、小于终点的坐标就可以知道中间是否有棋子
+                                    if (chesses[j].getX() < i && chesses[j].getX() > chess.getX()) {
+                                        //中间有一个棋子就不可以从这条横线过去
+                                        Count++;
+                                        break;
+                                    }
+                                }//for
+
+                                //从起点到终点(从下到上)
+                                for (int k = i + 57; k < chess.getX(); k += 57) {
+                                    //找起点和终点的棋子
+                                    if (chesses[j].getX() < chess.getX() && chesses[j].getX() > i) {
+                                        Count++;
+                                        break;
+                                    }
+                                }//for
+                            }//if
+                        }//for
+
+                        //起点和终点没有棋子
+                        if (Count == 0) {
+                            //当前记录添加到集合(用于悔棋)
+                            chainChess.add(String.valueOf(chess.isVisible()));
+                            chainChess.add(String.valueOf(chess.getX()));
+                            chainChess.add(String.valueOf(chess.getY()));
+                            chainChess.add(String.valueOf(chessOrder));
+
+                            chess.setBounds(i, chess.getY(), 55, 55);
+                            break;
+                        }
+                    }//if
+                }//for
+            }//else
+
+        }//炮、车移动方法结束
+
+        /**
+         * 炮、车吃棋规则
+         */
+        public void cannonAndChariotEat(int order, JLabel chess, JLabel eatenChess, JLabel chesses[], MouseEvent event) {
+            //起点和终点之间是否有棋子
+            int Count = 0;
+
+
+            //所有的棋子
+            for (int j = 0; j < 32; j++) {
+                //找出在同一条竖线的所有棋子、并不包括自己
+                if (chesses[j].getX() - chess.getX() >= -27 && chesses[j].getX() - chess.getX() <= 27 && chesses[j].getName() != chess.getName() && chesses[j].isVisible()) {
+
+                    //自己是起点被吃的是终点(从上到下)
+                    for (int k = chess.getY() + 57; k < eatenChess.getY(); k += 57) {
+                        //大于起点、小于终点的坐标就可以知道中间是否有棋子
+                        if (chesses[j].getY() < eatenChess.getY() && chesses[j].getY() > chess.getY()) {
+                            //计算起点和终点的棋子个数
+                            Count++;
+                            break;
+                        }
+                    }//for
+
+                    //自己是起点被吃的是终点(从下到上)
+                    for (int k = eatenChess.getY(); k < chess.getY(); k += 57) {
+                        //找起点和终点的棋子
+                        if (chesses[j].getY() < chess.getY() && chesses[j].getY() > eatenChess.getY()) {
+                            Count++;
+                            break;
+                        }
+                    }//for
+                }//if
+
+                //找出在同一条竖线的所有棋子、并不包括自己
+                else if (chesses[j].getY() - chess.getY() >= -10 && chesses[j].getY() - chess.getY() <= 10 && chesses[j].getName() != chess.getName() && chesses[j].isVisible()) {
+                    //自己是起点被吃的是终点(从左到右)
+                    for (int k = chess.getX() + 50; k < eatenChess.getX(); k += 57) {
+                        //大于起点、小于终点的坐标就可以知道中间是否有棋子
+                        if (chesses[j].getX() < eatenChess.getX() && chesses[j].getX() > chess.getX()) {
+                            Count++;
+                            break;
+                        }
+                    }//for
+
+                    //自己是起点被吃的是终点(从右到左)
+                    for (int k = eatenChess.getX(); k < chess.getX(); k += 57) {
+                        //找起点和终点的棋子
+                        if (chesses[j].getX() < chess.getX() && chesses[j].getX() > eatenChess.getX()) {
+                            Count++;
+                            break;
+                        }
+                    }//for
+                }//if
+            }//for
+
+            //起点和终点之间要一个棋子是炮的规则、并不能吃自己的棋子
+            if (Count == 1 && order == 0 && eatenChess.getName().charAt(1) != chess.getName().charAt(1)) {
+                //当前记录添加到集合(用于悔棋)
+                chainChess.add(String.valueOf(chess.isVisible()));
+                chainChess.add(String.valueOf(chess.getX()));
+                chainChess.add(String.valueOf(chess.getY()));
+                chainChess.add(String.valueOf(chessOrder));
+
+                //当前记录添加到集合(用于悔棋)
+                chainChess.add(String.valueOf(eatenChess.isVisible()));
+                chainChess.add(String.valueOf(eatenChess.getX()));
+                chainChess.add(String.valueOf(eatenChess.getY()));
+                chainChess.add(String.valueOf(i));
+
+                eatenChess.setVisible(false);
+                chess.setBounds(eatenChess.getX(), eatenChess.getY(), 55, 55);
+            }
+
+            //起点和终点之间没有棋子是车的规则、并不能吃自己的棋子
+            else if (Count == 0 && order == 1 && eatenChess.getName().charAt(1) != chess.getName().charAt(1)) {
+
+                //当前记录添加到集合(用于悔棋)
+                chainChess.add(String.valueOf(chess.isVisible()));
+                chainChess.add(String.valueOf(chess.getX()));
+                chainChess.add(String.valueOf(chess.getY()));
+                chainChess.add(String.valueOf(chessOrder));
+
+                //当前记录添加到集合(用于悔棋)
+                chainChess.add(String.valueOf(eatenChess.isVisible()));
+                chainChess.add(String.valueOf(eatenChess.getX()));
+                chainChess.add(String.valueOf(eatenChess.getY()));
+                chainChess.add(String.valueOf(i));
+
+                eatenChess.setVisible(false);
+                chess.setBounds(eatenChess.getX(), eatenChess.getY(), 55, 55);
+            }
+
+        }//炮、车吃棋方法结束
+
+        /**
+         * 马移动规则
+         */
+        public void horseMoveRule(JLabel horse, JLabel chesses[], MouseEvent event) {
+            //保存坐标和障碍
+            int Ex = 0, Ey = 0, Move = 0;
+
+            //上移、左边
+            if (horse.getX() - event.getX() >= 2 && horse.getX() - event.getX() <= 57 && horse.getY() - event.getY() >= 87 && horse.getY() - event.getY() <= 141) {
+                //合法的Y坐标
+                for (int i = 56; i <= 571; i += 57) {
+                    //移动的Y坐标是否有指定坐标相近的
+                    if (i - event.getY() >= -27 && i - event.getY() <= 27) {
+                        Ey = i;
+                        break;
+                    }
+                }
+
+                //合法的X坐标
+                for (int i = 24; i <= 480; i += 57) {
+                    //移动的X坐标是否有指定坐标相近的
+                    if (i - event.getX() >= -55 && i - event.getX() <= 0) {
+                        Ex = i;
+                        break;
+                    }
+                }
+
+                //正前方是否有别的棋子
+                for (int i = 0; i < 32; i++) {
+                    if (chesses[i].isVisible() && horse.getX() - chesses[i].getX() == 0 && horse.getY() - chesses[i].getY() == 57) {
+                        Move = 1;
+                        break;
+                    }
+                }
+
+                //可以移动该棋子
+                if (Move == 0) {
+                    //当前记录添加到集合(用于悔棋)
+                    chainChess.add(String.valueOf(horse.isVisible()));
+                    chainChess.add(String.valueOf(horse.getX()));
+                    chainChess.add(String.valueOf(horse.getY()));
+                    chainChess.add(String.valueOf(chessOrder));
+
+                    horse.setBounds(Ex, Ey, 55, 55);
+                }
+
+            }//if
+
+            //左移、上边
+            else if (horse.getY() - event.getY() >= 27 && horse.getY() - event.getY() <= 86 && horse.getX() - event.getX() >= 70 && horse.getX() - event.getX() <= 130) {
+                //Y
+                for (int i = 56; i <= 571; i += 57) {
+                    if (i - event.getY() >= -27 && i - event.getY() <= 27) {
+                        Ey = i;
+                    }
+                }
+
+                //X
+                for (int i = 24; i <= 480; i += 57) {
+                    if (i - event.getX() >= -55 && i - event.getX() <= 0) {
+                        Ex = i;
+                    }
+                }
+
+                //正左方是否有别的棋子
+                for (int i = 0; i < 32; i++) {
+                    if (chesses[i].isVisible() && horse.getY() - chesses[i].getY() == 0 && horse.getX() - chesses[i].getX() == 57) {
+                        Move = 1;
+                        break;
+                    }
+                }
+
+                if (Move == 0) {
+                    //当前记录添加到集合(用于悔棋)
+                    chainChess.add(String.valueOf(horse.isVisible()));
+                    chainChess.add(String.valueOf(horse.getX()));
+                    chainChess.add(String.valueOf(horse.getY()));
+                    chainChess.add(String.valueOf(chessOrder));
+
+                    horse.setBounds(Ex, Ey, 55, 55);
+                }
+            }//else
+
+            //下移、右边
+            else if (event.getY() - horse.getY() >= 87 && event.getY() - horse.getY() <= 141 && event.getX() - horse.getX() <= 87 && event.getX() - horse.getX() >= 2) {
+                //Y
+                for (int i = 56; i <= 571; i += 57) {
+                    if (i - event.getY() >= -27 && i - event.getY() <= 27) {
+                        Ey = i;
+                    }
+                }
+
+                //X
+                for (int i = 24; i <= 480; i += 57) {
+                    if (i - event.getX() >= -55 && i - event.getX() <= 0) {
+                        Ex = i;
+                    }
+                }
+
+                //正下方是否有别的棋子
+                for (int i = 0; i < 32; i++) {
+                    if (chesses[i].isVisible() && horse.getX() - chesses[i].getX() == 0 && chesses[i].getY() - horse.getY() == 57) {
+                        Move = 1;
+                        break;
+                    }
+                }
+
+                if (Move == 0) {
+                    //当前记录添加到集合(用于悔棋)
+                    chainChess.add(String.valueOf(horse.isVisible()));
+                    chainChess.add(String.valueOf(horse.getX()));
+                    chainChess.add(String.valueOf(horse.getY()));
+                    chainChess.add(String.valueOf(chessOrder));
+
+                    horse.setBounds(Ex, Ey, 55, 55);
+                }
+            }//else
+
+            //上移、右边
+            else if (horse.getY() - event.getY() >= 87 && horse.getY() - event.getY() <= 141 && event.getX() - horse.getX() <= 87 && event.getX() - horse.getX() >= 30) {
+                //合法的Y坐标
+                for (int i = 56; i <= 571; i += 57) {
+                    if (i - event.getY() >= -27 && i - event.getY() <= 27) {
+                        Ey = i;
+                        break;
+                    }
+                }
+
+                //合法的X坐标
+                for (int i = 24; i <= 480; i += 57) {
+                    if (i - event.getX() >= -55 && i - event.getX() <= 0) {
+                        Ex = i;
+                        break;
+                    }
+                }
+
+                //正前方是否有别的棋子
+                for (int i = 0; i < 32; i++) {
+//                    System.out.println(i + "playQ[i].getX()=" + playQ[i].getX());
+                    //System.out.println("play.getX()="+play.getX());
+                    if (chesses[i].isVisible() && horse.getX() - chesses[i].getX() == 0 && horse.getY() - chesses[i].getY() == 57) {
+                        Move = 1;
+                        //System.out.println("play.getY()="+play.getY());
+                        //System.out.println("playQ[i].getY()="+playQ[i].getY());
+                        break;
+                    }
+                }
+
+                //可以移动该棋子
+                if (Move == 0) {
+                    //当前记录添加到集合(用于悔棋)
+                    chainChess.add(String.valueOf(horse.isVisible()));
+                    chainChess.add(String.valueOf(horse.getX()));
+                    chainChess.add(String.valueOf(horse.getY()));
+                    chainChess.add(String.valueOf(chessOrder));
+
+                    horse.setBounds(Ex, Ey, 55, 55);
+                }
+            }//else
+
+            //下移、左边
+            else if (event.getY() - horse.getY() >= 87 && event.getY() - horse.getY() <= 141 && horse.getX() - event.getX() <= 87 && horse.getX() - event.getX() >= 10) {
+                //合法的Y坐标
+                for (int i = 56; i <= 571; i += 57) {
+                    if (i - event.getY() >= -27 && i - event.getY() <= 27) {
+                        Ey = i;
+                        break;
+                    }
+                }
+
+                //合法的X坐标
+                for (int i = 24; i <= 480; i += 57) {
+                    if (i - event.getX() >= -55 && i - event.getX() <= 0) {
+                        Ex = i;
+                        break;
+                    }
+                }
+
+                //正下方是否有别的棋子
+                for (int i = 0; i < 32; i++) {
+                    if (chesses[i].isVisible() && horse.getX() - chesses[i].getX() == 0 && horse.getY() - chesses[i].getY() == 57) {
+                        Move = 1;
+                        break;
+                    }
+                }
+
+                //可以移动该棋子
+                if (Move == 0) {
+                    //当前记录添加到集合(用于悔棋)
+                    chainChess.add(String.valueOf(horse.isVisible()));
+                    chainChess.add(String.valueOf(horse.getX()));
+                    chainChess.add(String.valueOf(horse.getY()));
+                    chainChess.add(String.valueOf(chessOrder));
+
+                    horse.setBounds(Ex, Ey, 55, 55);
+                }
+            }//else
+
+            //右移、上边
+            else if (horse.getY() - event.getY() >= 30 && horse.getY() - event.getY() <= 87 && event.getX() - horse.getX() <= 141 && event.getX() - horse.getX() >= 87) {
+                //Y
+                for (int i = 56; i <= 571; i += 57) {
+                    if (i - event.getY() >= -27 && i - event.getY() <= 27) {
+                        Ey = i;
+                    }
+                }
+
+                //X
+                for (int i = 24; i <= 480; i += 57) {
+                    if (i - event.getX() >= -55 && i - event.getX() <= 0) {
+                        Ex = i;
+                    }
+                }
+
+                //正右方是否有别的棋子
+                for (int i = 0; i < 32; i++) {
+                    if (chesses[i].isVisible() && horse.getY() - chesses[i].getY() == 0 && chesses[i].getX() - horse.getX() == 57) {
+                        Move = 1;
+                        break;
+                    }
+                }
+
+                if (Move == 0) {
+                    //当前记录添加到集合(用于悔棋)
+                    chainChess.add(String.valueOf(horse.isVisible()));
+                    chainChess.add(String.valueOf(horse.getX()));
+                    chainChess.add(String.valueOf(horse.getY()));
+                    chainChess.add(String.valueOf(chessOrder));
+
+                    horse.setBounds(Ex, Ey, 55, 55);
+                }
+            }//else
+
+            //右移、下边
+            else if (event.getY() - horse.getY() >= 30 && event.getY() - horse.getY() <= 87 && event.getX() - horse.getX() <= 141 && event.getX() - horse.getX() >= 87) {
+                //Y
+                for (int i = 56; i <= 571; i += 57) {
+                    if (i - event.getY() >= -27 && i - event.getY() <= 27) {
+                        Ey = i;
+                    }
+                }
+
+                //X
+                for (int i = 24; i <= 480; i += 57) {
+                    if (i - event.getX() >= -55 && i - event.getX() <= 0) {
+                        Ex = i;
+                    }
+                }
+
+                //正右方是否有别的棋子
+                for (int i = 0; i < 32; i++) {
+                    if (chesses[i].isVisible() && horse.getY() - chesses[i].getY() == 0 && chesses[i].getX() - horse.getX() == 57) {
+                        Move = 1;
+                        break;
+                    }
+                }
+
+                if (Move == 0) {
+                    //当前记录添加到集合(用于悔棋)
+                    chainChess.add(String.valueOf(horse.isVisible()));
+                    chainChess.add(String.valueOf(horse.getX()));
+                    chainChess.add(String.valueOf(horse.getY()));
+                    chainChess.add(String.valueOf(chessOrder));
+
+                    horse.setBounds(Ex, Ey, 55, 55);
+                }
+            }//else
+
+            //左移、下边
+            else if (event.getY() - horse.getY() >= 30 && event.getY() - horse.getY() <= 87 && horse.getX() - event.getX() <= 141 && horse.getX() - event.getX() >= 87) {
+                //Y
+                for (int i = 56; i <= 571; i += 57) {
+                    if (i - event.getY() >= -27 && i - event.getY() <= 27) {
+                        Ey = i;
+                    }
+                }
+
+                //X
+                for (int i = 24; i <= 480; i += 57) {
+                    if (i - event.getX() >= -55 && i - event.getX() <= 0) {
+                        Ex = i;
+                    }
+                }
+
+                //正左方是否有别的棋子
+                for (int i = 0; i < 32; i++) {
+                    if (chesses[i].isVisible() && horse.getY() - chesses[i].getY() == 0 && horse.getX() - chesses[i].getX() == 57) {
+                        Move = 1;
+                        break;
+                    }
+                }
+
+                if (Move == 0) {
+                    //当前记录添加到集合(用于悔棋)
+                    chainChess.add(String.valueOf(horse.isVisible()));
+                    chainChess.add(String.valueOf(horse.getX()));
+                    chainChess.add(String.valueOf(horse.getY()));
+                    chainChess.add(String.valueOf(chessOrder));
+
+                    horse.setBounds(Ex, Ey, 55, 55);
+                }
+
+            }//else
+
+        }//马移动结束
+
+        /**
+         * 马吃棋规则
+         */
+        public void horseEatRule(JLabel horse, JLabel eatenchess, JLabel chesses[], MouseEvent event) {
+            //障碍
+            int Move = 0;
+            boolean Chess = false;
+
+            //上移、左吃
+            if (horse.getName().charAt(1) != eatenchess.getName().charAt(1) && horse.getX() - eatenchess.getX() == 57 && horse.getY() - eatenchess.getY() == 114) {
+                //正前方是否有别的棋子
+                for (int i = 0; i < 32; i++) {
+                    if (chesses[i].isVisible() && horse.getX() - chesses[i].getX() == 0 && horse.getY() - chesses[i].getY() == 57) {
+                        Move = 1;
+                        break;
+                    }
+                }//for
+
+                Chess = true;
+
+            }//if
+
+            //上移、右吃
+            else if (horse.getY() - eatenchess.getY() == 114 && eatenchess.getX() - horse.getX() == 57) {
+                //正前方是否有别的棋子
+                for (int i = 0; i < 32; i++) {
+                    if (chesses[i].isVisible() && horse.getX() - chesses[i].getX() == 0 && horse.getY() - chesses[i].getY() == 57) {
+                        Move = 1;
+                        break;
+                    }
+                }//for
+
+                Chess = true;
+
+            }//else
+
+            //左移、上吃
+            else if (horse.getY() - eatenchess.getY() == 57 && horse.getX() - eatenchess.getX() == 114) {
+                //正左方是否有别的棋子
+                for (int i = 0; i < 32; i++) {
+                    if (chesses[i].isVisible() && horse.getY() - chesses[i].getY() == 0 && horse.getX() - chesses[i].getX() == 57) {
+                        Move = 1;
+                        break;
+                    }
+                }//for
+
+                Chess = true;
+
+            }//else
+
+            //左移、下吃
+            else if (eatenchess.getY() - horse.getY() == 57 && horse.getX() - eatenchess.getX() == 114) {
+                //正左方是否有别的棋子
+                for (int i = 0; i < 32; i++) {
+                    if (chesses[i].isVisible() && horse.getY() - chesses[i].getY() == 0 && horse.getX() - chesses[i].getX() == 57) {
+                        Move = 1;
+                        break;
+                    }
+                }//for
+
+                Chess = true;
+
+            }//else
+
+            //右移、上吃
+            else if (horse.getY() - eatenchess.getY() == 57 && eatenchess.getX() - horse.getX() == 114) {
+                //正右方是否有别的棋子
+                for (int i = 0; i < 32; i++) {
+                    if (chesses[i].isVisible() && horse.getY() - chesses[i].getY() == 0 && chesses[i].getX() - horse.getX() == 57) {
+                        Move = 1;
+                        break;
+                    }
+                }//for
+
+                Chess = true;
+
+            }//else
+
+            //右移、下吃
+            else if (eatenchess.getY() - horse.getY() == 57 && eatenchess.getX() - horse.getX() == 114) {
+                //正右方是否有别的棋子
+                for (int i = 0; i < 32; i++) {
+                    if (chesses[i].isVisible() && horse.getY() - chesses[i].getY() == 0 && chesses[i].getX() - horse.getX() == 57) {
+                        Move = 1;
+                        break;
+                    }
+                }//for
+
+                Chess = true;
+
+            }//else
+
+            //下移、左吃
+            else if (eatenchess.getY() - horse.getY() == 114 && horse.getX() - eatenchess.getX() == 57) {
+                //正下方是否有别的棋子
+                for (int i = 0; i < 32; i++) {
+                    if (chesses[i].isVisible() && horse.getX() - chesses[i].getX() == 0 && horse.getY() - chesses[i].getY() == -57) {
+                        Move = 1;
+                        break;
+
+                    }
+                }//for
+
+                Chess = true;
+
+            }//else
+
+            //下移、右吃
+            else if (eatenchess.getY() - horse.getY() == 114 && eatenchess.getX() - horse.getX() == 57) {
+                //正下方是否有别的棋子
+                for (int i = 0; i < 32; i++) {
+                    if (chesses[i].isVisible() && horse.getX() - chesses[i].getX() == 0 && horse.getY() - chesses[i].getY() == -57) {
+                        Move = 1;
+                        break;
+                    }
+                }//for
+
+                Chess = true;
+
+            }//else
+
+            //没有障碍、并可以吃棋、不能吃自己颜色
+            if (Chess && Move == 0 && eatenchess.getName().charAt(1) != horse.getName().charAt(1)) {
+                //当前记录添加到集合(用于悔棋)
+                chainChess.add(String.valueOf(horse.isVisible()));
+                chainChess.add(String.valueOf(horse.getX()));
+                chainChess.add(String.valueOf(horse.getY()));
+                chainChess.add(String.valueOf(chessOrder));
+
+                //当前记录添加到集合(用于悔棋)
+                chainChess.add(String.valueOf(eatenchess.isVisible()));
+                chainChess.add(String.valueOf(eatenchess.getX()));
+                chainChess.add(String.valueOf(eatenchess.getY()));
+                chainChess.add(String.valueOf(i));
+
+                eatenchess.setVisible(false);
+                horse.setBounds(eatenchess.getX(), eatenchess.getY(), 55, 55);
+            }
+        }
+
+        /**
+         * 相移动规则
+         */
+        public void elephantMoveRule(int order, JLabel elephant, JLabel chesses[], MouseEvent event) {
+            //坐标和障碍
+            int Ex = 0, Ey = 0, Move = 0;
+
+            //上左
+            if (elephant.getX() - event.getX() <= 141 && elephant.getX() - event.getX() >= 87 && elephant.getY() - event.getY() <= 141 && elephant.getY() - event.getY() >= 87) {
+                //合法的Y坐标
+                for (int i = 56; i <= 571; i += 57) {
+                    if (i - event.getY() >= -27 && i - event.getY() <= 27) {
+                        Ey = i;
+                        break;
+                    }
+                }
+
+                //合法的X坐标
+                for (int i = 24; i <= 480; i += 57) {
+                    if (i - event.getX() >= -27 && i - event.getX() <= 27) {
+                        Ex = i;
+                        break;
+                    }
+                }
+
+                //左上方是否有棋子
+                for (int i = 0; i < 32; i++) {
+                    if (chesses[i].isVisible() && elephant.getX() - chesses[i].getX() == 57 && elephant.getY() - chesses[i].getY() == 57) {
+                        Move++;
+                        break;
+                    }
+                }
+
+                //红旗不能过楚河
+                if (Move == 0 && Ey >= 341 && order > 9) {
+                    //当前记录添加到集合(用于悔棋)
+                    chainChess.add(String.valueOf(elephant.isVisible()));
+                    chainChess.add(String.valueOf(elephant.getX()));
+                    chainChess.add(String.valueOf(elephant.getY()));
+                    chainChess.add(String.valueOf(order));
+
+                    System.out.println("Ex=" + Ex);
+                    System.out.println("Ey=" + Ey);
+                    elephant.setBounds(Ex, Ey, 55, 55);
+                }
+
+                //黑旗不能过汉界
+                else if (Move == 0 && Ey <= 284 && order < 10) {
+                    //当前记录添加到集合(用于悔棋)
+                    chainChess.add(String.valueOf(elephant.isVisible()));
+                    chainChess.add(String.valueOf(elephant.getX()));
+                    chainChess.add(String.valueOf(elephant.getY()));
+                    chainChess.add(String.valueOf(order));
+
+                    elephant.setBounds(Ex, Ey, 55, 55);
+                }
+            }//if
+
+            //上右
+            else if (elephant.getY() - event.getY() <= 141 && elephant.getY() - event.getY() >= 87 && event.getX() - elephant.getX() >= 87 && event.getX() - elephant.getX() <= 141) {
+                //合法的Y坐标
+                for (int i = 56; i <= 571; i += 57) {
+                    if (i - event.getY() >= -27 && i - event.getY() <= 27) {
+                        Ey = i;
+                        break;
+                    }
+                }
+
+                //合法的X坐标
+                for (int i = 24; i <= 480; i += 57) {
+                    if (i - event.getX() >= -27 && i - event.getX() <= 27) {
+                        Ex = i;
+                        break;
+                    }
+                }
+
+                //右上方是否有棋子
+                for (int i = 0; i < 32; i++) {
+                    if (chesses[i].isVisible() && chesses[i].getX() - elephant.getX() == 57 && elephant.getY() - chesses[i].getY() == 57) {
+                        Move++;
+                        break;
+                    }
+                }
+
+                //相、象规则
+                if (Move == 0 && Ey >= 341 && order > 9) {
+                    //当前记录添加到集合(用于悔棋)
+                    chainChess.add(String.valueOf(elephant.isVisible()));
+                    chainChess.add(String.valueOf(elephant.getX()));
+                    chainChess.add(String.valueOf(elephant.getY()));
+                    chainChess.add(String.valueOf(order));
+
+                    elephant.setBounds(Ex, Ey, 55, 55);
+                } else if (Move == 0 && Ey <= 284 && order < 10) {
+                    //当前记录添加到集合(用于悔棋)
+                    chainChess.add(String.valueOf(elephant.isVisible()));
+                    chainChess.add(String.valueOf(elephant.getX()));
+                    chainChess.add(String.valueOf(elephant.getY()));
+                    chainChess.add(String.valueOf(order));
+
+                    elephant.setBounds(Ex, Ey, 55, 55);
+                }
+
+            }// else if
+
+            //下左
+            else if (elephant.getX() - event.getX() <= 141 && elephant.getX() - event.getX() >= 87 && event.getY() - elephant.getY() <= 141 && event.getY() - elephant.getY() >= 87) {
+                //合法的Y坐标
+                for (int i = 56; i <= 571; i += 57) {
+                    if (i - event.getY() >= -27 && i - event.getY() <= 27) {
+                        Ey = i;
+                        break;
+                    }
+                }
+
+                //合法的X坐标
+                for (int i = 24; i <= 480; i += 57) {
+                    if (i - event.getX() >= -27 && i - event.getX() <= 27) {
+                        Ex = i;
+                        break;
+                    }
+                }
+
+                //下左方是否有棋子
+                for (int i = 0; i < 32; i++) {
+                    if (chesses[i].isVisible() && elephant.getX() - chesses[i].getX() == 57 && elephant.getY() - chesses[i].getY() == -57) {
+                        Move++;
+                        break;
+                    }
+                }
+
+                //相、象规则
+
+                if (Move == 0 && Ey >= 341 && order > 9) {
+                    //当前记录添加到集合(用于悔棋)
+                    chainChess.add(String.valueOf(elephant.isVisible()));
+                    chainChess.add(String.valueOf(elephant.getX()));
+                    chainChess.add(String.valueOf(elephant.getY()));
+                    chainChess.add(String.valueOf(order));
+
+                    elephant.setBounds(Ex, Ey, 55, 55);
+                } else if (Move == 0 && Ey <= 284 && order < 10) {
+                    //当前记录添加到集合(用于悔棋)
+                    chainChess.add(String.valueOf(elephant.isVisible()));
+                    chainChess.add(String.valueOf(elephant.getX()));
+                    chainChess.add(String.valueOf(elephant.getY()));
+                    chainChess.add(String.valueOf(order));
+
+                    elephant.setBounds(Ex, Ey, 55, 55);
+                }
+            }//else if
+
+            //下右
+            else if (event.getX() - elephant.getX() >= 87 && event.getX() - elephant.getX() <= 141 && event.getY() - elephant.getY() >= 87 && event.getY() - elephant.getY() <= 141) {
+                //Y
+                for (int i = 56; i <= 571; i += 57) {
+                    if (i - event.getY() >= -27 && i - event.getY() <= 27) {
+                        Ey = i;
+                    }
+                }
+
+                //X
+                for (int i = 24; i <= 480; i += 57) {
+                    if (i - event.getX() >= -27 && i - event.getX() <= 27) {
+                        Ex = i;
+                    }
+                }
+
+                //下右方是否有棋子
+                for (int i = 0; i < 32; i++) {
+                    if (chesses[i].isVisible() && chesses[i].getX() - elephant.getX() == 57 && chesses[i].getY() - elephant.getY() == 57) {
+                        Move = 1;
+                        break;
+                    }
+                }
+
+                //相、象规则
+                if (Move == 0 && Ey >= 341 && order > 9) {
+                    //当前记录添加到集合(用于悔棋)
+                    chainChess.add(String.valueOf(elephant.isVisible()));
+                    chainChess.add(String.valueOf(elephant.getX()));
+                    chainChess.add(String.valueOf(elephant.getY()));
+                    chainChess.add(String.valueOf(order));
+
+                    elephant.setBounds(Ex, Ey, 55, 55);
+                } else if (Move == 0 && Ey <= 284 && order < 10) {
+                    //当前记录添加到集合(用于悔棋)
+                    chainChess.add(String.valueOf(elephant.isVisible()));
+                    chainChess.add(String.valueOf(elephant.getX()));
+                    chainChess.add(String.valueOf(elephant.getY()));
+                    chainChess.add(String.valueOf(order));
+
+                    elephant.setBounds(Ex, Ey, 55, 55);
+                }
+
+            }//else
+
+        }//相移动规则吉束
+
+        /**
+         * 相、象吃棋规则
+         */
+        public void elephantEatRule(JLabel elephant, JLabel eatenChess, JLabel chesses[]) {
+            //障碍
+            int Move = 0;
+            boolean Chess = false;
+
+            //吃左上方的棋子
+            if (elephant.getX() - eatenChess.getX() >= 87 && elephant.getX() - eatenChess.getX() <= 141 && elephant.getY() - eatenChess.getY() >= 87 && elephant.getY() - eatenChess.getY() <= 141) {
+                //左上方是否有棋子
+                for (int i = 0; i < 32; i++) {
+                    if (chesses[i].isVisible() && elephant.getX() - chesses[i].getX() == 57 && elephant.getY() - chesses[i].getY() == 57) {
+                        Move++;
+                        break;
+                    }
+                }//for
+
+                Chess = true;
+
+            }//if
+
+            //吃右上方的棋子
+            else if (eatenChess.getX() - elephant.getX() >= 87 && eatenChess.getX() - elephant.getX() <= 141 && elephant.getY() - eatenChess.getY() >= 87 && elephant.getY() - eatenChess.getY() <= 141) {
+                //右上方是否有棋子
+                for (int i = 0; i < 32; i++) {
+                    if (chesses[i].isVisible() && chesses[i].getX() - elephant.getX() == 57 && elephant.getY() - chesses[i].getY() == 57) {
+                        Move++;
+                        break;
+                    }
+                }//for
+
+                Chess = true;
+            }//else
+
+            //吃下左方的棋子
+            else if (elephant.getX() - eatenChess.getX() >= 87 && elephant.getX() - eatenChess.getX() <= 141 && eatenChess.getY() - elephant.getY() >= 87 && eatenChess.getY() - elephant.getY() <= 141) {
+                //下左方是否有棋子
+                for (int i = 0; i < 32; i++) {
+                    if (chesses[i].isVisible() && elephant.getX() - chesses[i].getX() == 57 && elephant.getY() - chesses[i].getY() == -57) {
+                        Move++;
+                        break;
+                    }
+                }//for
+
+                Chess = true;
+            }//else
+
+            //吃下右放的棋子
+            else if (eatenChess.getX() - elephant.getX() >= 87 && eatenChess.getX() - elephant.getX() <= 141 && eatenChess.getY() - elephant.getY() >= 87 && eatenChess.getY() - elephant.getY() <= 141) {
+                //下右方是否有棋子
+                for (int i = 0; i < 32; i++) {
+                    if (chesses[i].isVisible() && chesses[i].getX() - elephant.getX() == 57 && chesses[i].getY() - elephant.getY() == 57) {
+                        Move = 1;
+                        break;
+                    }
+                }//for
+
+                Chess = true;
+
+            }//else
+
+            //没有障碍、并不能吃自己的棋子
+            if (Chess && Move == 0 && eatenChess.getName().charAt(1) != elephant.getName().charAt(1)) {
+                //当前记录添加到集合(用于悔棋)
+                chainChess.add(String.valueOf(elephant.isVisible()));
+                chainChess.add(String.valueOf(elephant.getX()));
+                chainChess.add(String.valueOf(elephant.getY()));
+                chainChess.add(String.valueOf(chessOrder));
+
+                //当前记录添加到集合(用于悔棋)
+                chainChess.add(String.valueOf(eatenChess.isVisible()));
+                chainChess.add(String.valueOf(eatenChess.getX()));
+                chainChess.add(String.valueOf(eatenChess.getY()));
+                chainChess.add(String.valueOf(i));
+
+                eatenChess.setVisible(false);
+                elephant.setBounds(eatenChess.getX(), eatenChess.getY(), 55, 55);
+            }
+
+        }//相、象吃棋规则结束
+
+        /**
+         * 士、仕移动方法
+         */
+        public void dvisorMoveRule(int order, JLabel dvisor, JLabel chesses[], MouseEvent event) {
+            //上、右
+            if (event.getX() - dvisor.getX() >= 29 && event.getX() - dvisor.getX() <= 114 && dvisor.getY() - event.getY() >= 25 && dvisor.getY() - event.getY() <= 90) {
+                //士不能超过自己的界限
+                if (order < 14 && (dvisor.getX() + 57) >= 195 && (dvisor.getX() + 57) <= 309 && (dvisor.getY() - 57) <= 170) {
+                    //当前记录添加到集合(用于悔棋)
+                    chainChess.add(String.valueOf(dvisor.isVisible()));
+                    chainChess.add(String.valueOf(dvisor.getX()));
+                    chainChess.add(String.valueOf(dvisor.getY()));
+                    chainChess.add(String.valueOf(order));
+
+                    dvisor.setBounds(dvisor.getX() + 57, dvisor.getY() - 57, 55, 55);
+                }
+
+                //仕不能超过自己的界限
+                else if (order > 13 && (dvisor.getY() - 57) >= 455 && (dvisor.getX() + 57) >= 195 && (dvisor.getX() + 57) <= 309) {
+                    //当前记录添加到集合(用于悔棋)
+                    chainChess.add(String.valueOf(dvisor.isVisible()));
+                    chainChess.add(String.valueOf(dvisor.getX()));
+                    chainChess.add(String.valueOf(dvisor.getY()));
+                    chainChess.add(String.valueOf(order));
+
+                    dvisor.setBounds(dvisor.getX() + 57, dvisor.getY() - 57, 55, 55);
+                }
+            }// else if
+
+            //上、左
+            else if (dvisor.getX() - event.getX() <= 114 && dvisor.getX() - event.getX() >= 25 && dvisor.getY() - event.getY() >= 20 && dvisor.getY() - event.getY() <= 95) {
+                //士不能超过自己的界限
+                if (order < 14 && (dvisor.getX() - 57) >= 195 && (dvisor.getX() - 57) <= 309 && (dvisor.getY() - 57) <= 170) {
+                    //当前记录添加到集合(用于悔棋)
+                    chainChess.add(String.valueOf(dvisor.isVisible()));
+                    chainChess.add(String.valueOf(dvisor.getX()));
+                    chainChess.add(String.valueOf(dvisor.getY()));
+                    chainChess.add(String.valueOf(order));
+
+                    dvisor.setBounds(dvisor.getX() - 57, dvisor.getY() - 57, 55, 55);
+                }
+
+                //仕不能超过自己的界限
+                else if (order > 13 && (dvisor.getY() - 57) >= 455 && (dvisor.getX() - 57) >= 195 && (dvisor.getX() - 57) <= 309) {
+                    //当前记录添加到集合(用于悔棋)
+                    chainChess.add(String.valueOf(dvisor.isVisible()));
+                    chainChess.add(String.valueOf(dvisor.getX()));
+                    chainChess.add(String.valueOf(dvisor.getY()));
+                    chainChess.add(String.valueOf(order));
+
+                    dvisor.setBounds(dvisor.getX() - 57, dvisor.getY() - 57, 55, 55);
+                }
+            }// else if
+
+            //下、左
+            else if (dvisor.getX() - event.getX() <= 114 && dvisor.getX() - event.getX() >= 20 && event.getY() - dvisor.getY() >= 2 && event.getY() - dvisor.getY() <= 87) {
+                //士不能超过自己的界限
+                if (order < 14 && (dvisor.getX() - 57) >= 195 && (dvisor.getX() - 57) <= 309 && (dvisor.getY() + 57) <= 170) {
+                    //当前记录添加到集合(用于悔棋)
+                    chainChess.add(String.valueOf(dvisor.isVisible()));
+                    chainChess.add(String.valueOf(dvisor.getX()));
+                    chainChess.add(String.valueOf(dvisor.getY()));
+                    chainChess.add(String.valueOf(order));
+
+                    dvisor.setBounds(dvisor.getX() - 57, dvisor.getY() + 57, 55, 55);
+                }
+
+                //仕不能超过自己的界限
+                else if (order > 13 && (dvisor.getY() + 57) >= 455 && (dvisor.getX() - 57) >= 195 && (dvisor.getX() - 57) <= 309) {
+                    //当前记录添加到集合(用于悔棋)
+                    chainChess.add(String.valueOf(dvisor.isVisible()));
+                    chainChess.add(String.valueOf(dvisor.getX()));
+                    chainChess.add(String.valueOf(dvisor.getY()));
+                    chainChess.add(String.valueOf(order));
+
+                    dvisor.setBounds(dvisor.getX() - 57, dvisor.getY() + 57, 55, 55);
+                }
+
+            }// else if
+
+
+            //下、右
+            else if (event.getX() - dvisor.getX() >= 27 && event.getX() - dvisor.getX() <= 114 && event.getY() - dvisor.getY() >= 2 && event.getY() - dvisor.getY() <= 87) {
+                //士不能超过自己的界限
+                if (order < 14 && (dvisor.getX() + 57) >= 195 && (dvisor.getX() + 57) <= 309 && (dvisor.getY() + 57) <= 170) {
+                    //当前记录添加到集合(用于悔棋)
+                    chainChess.add(String.valueOf(dvisor.isVisible()));
+                    chainChess.add(String.valueOf(dvisor.getX()));
+                    chainChess.add(String.valueOf(dvisor.getY()));
+                    chainChess.add(String.valueOf(order));
+
+                    dvisor.setBounds(dvisor.getX() + 57, dvisor.getY() + 57, 55, 55);
+                }
+
+                //仕不能超过自己的界限
+                else if (order > 13 && (dvisor.getY() + 57) >= 455 && (dvisor.getX() + 57) >= 195 && (dvisor.getX() + 57) <= 309) {
+                    //当前记录添加到集合(用于悔棋)
+                    chainChess.add(String.valueOf(dvisor.isVisible()));
+                    chainChess.add(String.valueOf(dvisor.getX()));
+                    chainChess.add(String.valueOf(dvisor.getY()));
+                    chainChess.add(String.valueOf(order));
+
+                    dvisor.setBounds(dvisor.getX() + 57, dvisor.getY() + 57, 55, 55);
+                }
+            }//else if
+
+        }//士、仕移动规则结束
+
+        /**
+         * 士、仕吃棋规则
+         */
+        public void dvisorEatRule(int order, JLabel dvisor, JLabel eatenChess, JLabel chesses[]) {
+            //当前状态
+            boolean Chap = false;
+
+            //上、右
+            if (eatenChess.getX() - dvisor.getX() >= 20 && eatenChess.getX() - dvisor.getX() <= 114 && dvisor.getY() - eatenChess.getY() >= 2 && dvisor.getY() - eatenChess.getY() <= 87) {
+                //被吃的棋子是否和当前士相近
+                if (order < 14 && eatenChess.getX() >= 195 && eatenChess.getX() <= 309 && eatenChess.getY() <= 170 && eatenChess.isVisible()) {
+                    Chap = true;
+                }
+
+                //被吃的棋子是否和当前仕相近
+                else if (order > 13 && eatenChess.getX() >= 195 && eatenChess.getX() <= 309 && eatenChess.getY() >= 455 && eatenChess.isVisible()) {
+                    Chap = true;
+                }
+            }//if
+
+            //上、左
+            else if (dvisor.getX() - eatenChess.getX() <= 114 && dvisor.getX() - eatenChess.getX() >= 25 && dvisor.getY() - eatenChess.getY() >= 2 && dvisor.getY() - eatenChess.getY() <= 87) {
+                //被吃的棋子是否和当前士相近
+                if (order < 14 && eatenChess.getX() >= 195 && eatenChess.getX() <= 309 && eatenChess.getY() <= 170 && eatenChess.isVisible()) {
+                    Chap = true;
+                }
+
+                //被吃的棋子是否和当前仕相近
+                else if (order > 13 && eatenChess.getX() >= 195 && eatenChess.getX() <= 309 && eatenChess.getY() >= 455 && eatenChess.isVisible()) {
+                    Chap = true;
+                }
+            }// else if
+
+            //下、左
+            else if (dvisor.getX() - eatenChess.getX() <= 114 && dvisor.getX() - eatenChess.getX() >= 25 && eatenChess.getY() - dvisor.getY() >= 2 && eatenChess.getY() - dvisor.getY() <= 87) {
+                //被吃的棋子是否和当前士相近
+                if (order < 14 && eatenChess.getX() >= 195 && eatenChess.getX() <= 309 && eatenChess.getY() <= 170 && eatenChess.isVisible()) {
+                    Chap = true;
+                }
+
+                //被吃的棋子是否和当前仕相近
+                else if (order > 13 && eatenChess.getX() >= 195 && eatenChess.getX() <= 309 && eatenChess.getY() >= 455 && eatenChess.isVisible()) {
+                    Chap = true;
+                }
+            }// else if
+
+            //下、右
+            else if (eatenChess.getX() - dvisor.getX() >= 25 && eatenChess.getX() - dvisor.getX() <= 114 && eatenChess.getY() - dvisor.getY() >= 2 && eatenChess.getY() - dvisor.getY() <= 87) {
+                //被吃的棋子是否和当前士相近
+                if (order < 14 && eatenChess.getX() >= 195 && eatenChess.getX() <= 309 && eatenChess.getY() <= 170 && eatenChess.isVisible()) {
+                    Chap = true;
+                }
+
+                //被吃的棋子是否和当前仕相近
+                else if (order > 13 && eatenChess.getX() >= 195 && eatenChess.getX() <= 309 && eatenChess.getY() >= 455 && eatenChess.isVisible()) {
+                    Chap = true;
+                }
+            }//else if
+
+            //可移动、并不能吃自己的棋子
+            if (Chap && eatenChess.getName().charAt(1) != dvisor.getName().charAt(1)) {
+                //当前记录添加到集合(用于悔棋)
+                chainChess.add(String.valueOf(dvisor.isVisible()));
+                chainChess.add(String.valueOf(dvisor.getX()));
+                chainChess.add(String.valueOf(dvisor.getY()));
+                chainChess.add(String.valueOf(order));
+
+                //当前记录添加到集合(用于悔棋)
+                chainChess.add(String.valueOf(eatenChess.isVisible()));
+                chainChess.add(String.valueOf(eatenChess.getX()));
+                chainChess.add(String.valueOf(eatenChess.getY()));
+                chainChess.add(String.valueOf(i));
+
+                eatenChess.setVisible(false);
+                dvisor.setBounds(eatenChess.getX(), eatenChess.getY(), 55, 55);
+            }
+
+        }//士、仕吃棋规则结束
+
+        /**
+         * 将移动规则
+         */
+        public void eneralMoveRule(int chessOrder, JLabel chess, JLabel chesses[], MouseEvent event) {
+            //向上
+            if ((event.getX() - chess.getX()) >= 0 && (event.getX() - chess.getX()) <= 55 && (chess.getY() - event.getY()) >= 2 && chess.getY() - event.getY() <= 87) {
+                //将是否超过自己的界限
+                if (chessOrder == 30 && event.getX() >= 195 && event.getX() <= 359 && event.getY() <= 170) {
+                    //当前记录添加到集合(用于悔棋)
+                    chainChess.add(String.valueOf(chess.isVisible()));
+                    chainChess.add(String.valueOf(chess.getX()));
+                    chainChess.add(String.valueOf(chess.getY()));
+                    chainChess.add(String.valueOf(chessOrder));
+
+                    chess.setBounds(chess.getX(), chess.getY() - 57, 55, 55);
+                }
+
+                //帅是否超过自己的界限
+                else if (chessOrder == 31 && event.getY() >= 455 && event.getX() >= 195 && event.getX() <= 359) {
+                    //当前记录添加到集合(用于悔棋)
+                    chainChess.add(String.valueOf(chess.isVisible()));
+                    chainChess.add(String.valueOf(chess.getX()));
+                    chainChess.add(String.valueOf(chess.getY()));
+                    chainChess.add(String.valueOf(chessOrder));
+
+                    chess.setBounds(chess.getX(), chess.getY() - 57, 55, 55);
+                }
+            }//if
+
+            //向左
+            else if (chess.getX() - event.getX() >= 2 && chess.getX() - event.getX() <= 57 && event.getY() - chess.getY() <= 27 && event.getY() - chess.getY() >= -27) {
+                //将是否超过自己的界限
+                if (chessOrder == 30 && event.getX() >= 195 && event.getX() <= 359 && event.getY() <= 170) {
+                    //当前记录添加到集合(用于悔棋)
+                    chainChess.add(String.valueOf(chess.isVisible()));
+                    chainChess.add(String.valueOf(chess.getX()));
+                    chainChess.add(String.valueOf(chess.getY()));
+                    chainChess.add(String.valueOf(chessOrder));
+
+                    chess.setBounds(chess.getX() - 57, chess.getY(), 55, 55);
+                }
+
+                //帅是否超过自己的界限
+                else if (chessOrder == 31 && event.getY() >= 455 && event.getX() >= 195 && event.getX() <= 359) {
+                    //当前记录添加到集合(用于悔棋)
+                    chainChess.add(String.valueOf(chess.isVisible()));
+                    chainChess.add(String.valueOf(chess.getX()));
+                    chainChess.add(String.valueOf(chess.getY()));
+                    chainChess.add(String.valueOf(chessOrder));
+
+                    chess.setBounds(chess.getX() - 57, chess.getY(), 55, 55);
+                }
+            }//else if
+
+            //向右
+            else if (event.getX() - chess.getX() >= 57 && event.getX() - chess.getX() <= 112 && event.getY() - chess.getY() <= 27 && event.getY() - chess.getY() >= -27) {
+                //将、帅规则
+                if (chessOrder == 30 && event.getX() >= 195 && event.getX() <= 359 && event.getY() <= 170) {
+                    //当前记录添加到集合(用于悔棋)
+                    chainChess.add(String.valueOf(chess.isVisible()));
+                    chainChess.add(String.valueOf(chess.getX()));
+                    chainChess.add(String.valueOf(chess.getY()));
+                    chainChess.add(String.valueOf(chessOrder));
+
+                    chess.setBounds(chess.getX() + 57, chess.getY(), 55, 55);
+                } else if (chessOrder == 31 && event.getY() >= 455 && event.getX() >= 195 && event.getX() <= 359) {
+                    //当前记录添加到集合(用于悔棋)
+                    chainChess.add(String.valueOf(chess.isVisible()));
+                    chainChess.add(String.valueOf(chess.getX()));
+                    chainChess.add(String.valueOf(chess.getY()));
+                    chainChess.add(String.valueOf(chessOrder));
+
+                    chess.setBounds(chess.getX() + 57, chess.getY(), 55, 55);
+                }
+            }//else if
+
+            //向下
+            else if (event.getX() - chess.getX() >= 0 && event.getX() - chess.getX() <= 55 && event.getY() - chess.getY() <= 87 && event.getY() - chess.getY() >= 27) {
+                //将、帅规则
+                if (chessOrder == 30 && event.getX() >= 195 && event.getX() <= 359 && event.getY() <= 170) {
+                    //当前记录添加到集合(用于悔棋)
+                    chainChess.add(String.valueOf(chess.isVisible()));
+                    chainChess.add(String.valueOf(chess.getX()));
+                    chainChess.add(String.valueOf(chess.getY()));
+                    chainChess.add(String.valueOf(chessOrder));
+
+                    chess.setBounds(chess.getX(), chess.getY() + 57, 55, 55);
+                } else if (chessOrder == 31 && event.getY() >= 455 && event.getX() >= 195 && event.getX() <= 359) {
+                    //当前记录添加到集合(用于悔棋)
+                    chainChess.add(String.valueOf(chess.isVisible()));
+                    chainChess.add(String.valueOf(chess.getX()));
+                    chainChess.add(String.valueOf(chess.getY()));
+                    chainChess.add(String.valueOf(chessOrder));
+
+                    chess.setBounds(chess.getX(), chess.getY() + 57, 55, 55);
+                }
+
+            }//else if
+
+        }//将、帅移动规则结束
+
+        /**
+         * 将吃棋规则
+         */
+        public void eneralEatRule(int order, JLabel eneral, JLabel eatenChess, JLabel chesses[]) {
+            //当前状态
+            boolean will = false;
+
+            //向上吃
+            if (eneral.getX() - eatenChess.getX() >= 0 && eneral.getX() - eatenChess.getX() <= 55 && eneral.getY() - eatenChess.getY() >= 27 && eneral.getY() - eatenChess.getY() <= 87 && eatenChess.isVisible()) {
+                //被吃的棋子是否和当前将相近
+                if (order == 30 && eatenChess.getX() >= 195 && eatenChess.getX() <= 309 && eatenChess.getY() <= 170) {
+                    will = true;
+                }
+
+                //被吃的棋子是否和当前帅相近
+                else if (order == 31 && eatenChess.getY() >= 455 && eatenChess.getX() >= 195 && eatenChess.getX() <= 309) {
+                    will = true;
+                }
+            }
+
+            //向左吃
+            else if (eneral.getX() - eatenChess.getX() >= 2 && eneral.getX() - eatenChess.getX() <= 57 && eatenChess.getY() - eneral.getY() <= 27 && eatenChess.getY() - eneral.getY() >= -27 && eatenChess.isVisible()) {
+                //被吃的棋子是否和当前将相近
+                if (order == 30 && eatenChess.getX() >= 195 && eatenChess.getX() <= 309 && eatenChess.getY() <= 170) {
+                    will = true;
+                }
+
+                //被吃的棋子是否和当前帅相近
+                else if (order == 31 && eatenChess.getY() >= 455 && eatenChess.getX() >= 195 && eatenChess.getX() <= 309) {
+                    will = true;
+                }
+            }
+
+            //向右吃
+            else if (eatenChess.getX() - eneral.getX() >= 2 && eatenChess.getX() - eneral.getX() <= 57 && eatenChess.getY() - eneral.getY() <= 27 && eatenChess.getY() - eneral.getY() >= -27 && eatenChess.isVisible()) {
+                //被吃的棋子是否和当前将相近
+                if (order == 30 && eatenChess.getX() >= 195 && eatenChess.getX() <= 309 && eatenChess.getY() <= 170) {
+                    will = true;
+                }
+
+                //被吃的棋子是否和当前帅相近
+                else if (order == 31 && eatenChess.getY() >= 455 && eatenChess.getX() >= 195 && eatenChess.getX() <= 309) {
+                    will = true;
+                }
+            }
+
+            //向下
+            else if (eatenChess.getX() - eneral.getX() >= 0 && eatenChess.getX() - eneral.getX() <= 87 && eatenChess.getY() - eneral.getY() <= 27 && eatenChess.getY() - eneral.getY() >= 40 && eatenChess.isVisible()) {
+                //被吃的棋子是否和当前将相近
+                if (order == 30 && eatenChess.getX() >= 195 && eatenChess.getX() <= 309 && eatenChess.getY() <= 170) {
+                    will = true;
+                }
+
+                //被吃的棋子是否和当前帅相近
+                else if (order == 31 && eatenChess.getY() >= 455 && eatenChess.getX() >= 195 && eatenChess.getX() <= 309) {
+                    will = true;
+                }
+            }
+
+            //不能吃自己的棋子、符合当前要求
+            if (eatenChess.getName().charAt(1) != eneral.getName().charAt(1) && will) {
+                //当前记录添加到集合(用于悔棋)
+                chainChess.add(String.valueOf(eneral.isVisible()));
+                chainChess.add(String.valueOf(eneral.getX()));
+                chainChess.add(String.valueOf(eneral.getY()));
+                chainChess.add(String.valueOf(order));
+
+                //当前记录添加到集合(用于悔棋)
+                chainChess.add(String.valueOf(eatenChess.isVisible()));
+                chainChess.add(String.valueOf(eatenChess.getX()));
+                chainChess.add(String.valueOf(eatenChess.getY()));
+                chainChess.add(String.valueOf(i));
+
+                eatenChess.setVisible(false);
+                eneral.setBounds(eatenChess.getX(), eatenChess.getY(), 55, 55);
+            }
+
+        }//将、帅吃规则结束
+    }//规则类
+
+    public void mousePressed(MouseEvent event) {
+    }
+
+    public void mouseReleased(MouseEvent event) {
+    }
+
+    public void mouseEntered(MouseEvent event) {
+    }
+
+    public void mouseExited(MouseEvent event) {
+    }
+}//主框架类
